@@ -4,7 +4,7 @@ from discord.ext import commands
 class RoKBot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Tüm birlik rollerinin ID'leri eksiksiz
+        # Birlik rol ID'lerin
         self.ROLE_IDS = {
             "Infantry": 1526342009596547142,
             "Cavalry": 1526341870899298426,
@@ -17,46 +17,41 @@ class RoKBot(commands.Cog):
     async def kayit(self, ctx):
         await ctx.message.delete()
         
-        # Birlik seçme menüsü
-        class RoleSelect(discord.ui.Select):
+        class RoleToggleSelect(discord.ui.Select):
             def __init__(self, role_ids):
-                options = [discord.SelectOption(label=name, value=str(role_id)) for name, role_id in role_ids.items()]
-                super().__init__(placeholder="Birliğinizi seçin...", options=options)
+                options = [discord.SelectOption(label=name, value=str(rid)) for name, rid in role_ids.items()]
+                # min_values=0 ve max_values=len ile çoklu seçime izin veriyoruz
+                super().__init__(placeholder="Birliklerinizi seçin/kaldırın...", 
+                                 min_values=0, max_values=len(role_ids), options=options)
             
-            async def callback(self, interaction: discord.Interaction):
-                role_id = int(self.values[0])
-                role = interaction.guild.get_role(role_id)
-                if role:
-                    await interaction.user.add_roles(role)
-                    await interaction.response.send_message(f"✅ {role.name} rolü başarıyla verildi!", ephemeral=True)
+            async def callback(self, i: discord.Interaction):
+                selected_role_ids = [int(v) for v in self.values]
+                all_role_ids = list(self.role_ids.values())
+                
+                # Kullanıcının mevcut rollerini temizle (sadece bizim birlik rollerinden)
+                roles_to_remove = [r for r in i.user.roles if r.id in all_role_ids]
+                await i.user.remove_roles(*roles_to_remove)
+                
+                # Seçilenleri ekle
+                roles_to_add = [i.guild.get_role(rid) for rid in selected_role_ids if i.guild.get_role(rid)]
+                if roles_to_add:
+                    await i.user.add_roles(*roles_to_add)
+                
+                msg = f"✅ Güncellendi: {', '.join([r.name for r in roles_to_add]) if roles_to_add else 'Hiçbir birlik seçilmedi.'}"
+                await i.response.send_message(msg, ephemeral=True)
 
-        # İsim değiştirme modalı
-        class NicknameModal(discord.ui.Modal, title='RoK Kayıt Sistemi'):
-            isim = discord.ui.TextInput(label='Oyun içi isminiz?', required=True)
+        class NicknameModal(discord.ui.Modal, title='RoK Kayıt'):
+            isim = discord.ui.TextInput(label='Oyun isminiz?', required=True)
+            def __init__(self, role_ids): super().__init__(); self.role_ids = role_ids
+            async def on_submit(self, i: discord.Interaction):
+                await i.user.edit(nick=str(self.isim))
+                view = discord.ui.View().add_item(RoleToggleSelect(self.role_ids))
+                await i.response.send_message("İsim güncellendi! Birlikleri seçin/kaldırın:", view=view, ephemeral=True)
 
-            def __init__(self, role_ids):
-                super().__init__()
-                self.role_ids = role_ids
-
-            async def on_submit(self, interaction: discord.Interaction):
-                try:
-                    await interaction.user.edit(nick=str(self.isim))
-                    # İsim güncellendikten sonra rol seçimi için View gönder
-                    view = discord.ui.View().add_item(RoleSelect(self.role_ids))
-                    await interaction.response.send_message("İsminiz güncellendi! Şimdi birliğinizi seçin:", view=view, ephemeral=True)
-                except Exception as e:
-                    await interaction.response.send_message(f"Bir hata oluştu: {e}", ephemeral=True)
-
-        # Kayıt başlatma butonu
         btn = discord.ui.Button(label="Kaydı Başlat", style=discord.ButtonStyle.primary)
-        async def btn_callback(interaction: discord.Interaction):
-            await interaction.response.send_modal(NicknameModal(self.ROLE_IDS))
-            
-        btn.callback = btn_callback
-        view = discord.ui.View(timeout=None)
-        view.add_item(btn)
-        
-        await ctx.send("Kayıt olmak için aşağıdaki butona tıklayın:", view=view)
+        btn.callback = lambda i: i.response.send_modal(NicknameModal(self.ROLE_IDS))
+        view = discord.ui.View(timeout=None).add_item(btn)
+        await ctx.send("Kayıt için tıklayın:", view=view)
 
 async def setup(bot):
     await bot.add_cog(RoKBot(bot))
