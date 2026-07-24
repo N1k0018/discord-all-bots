@@ -31,10 +31,10 @@ class LanguageSelectView(discord.ui.View):
             set_user_lang(interaction.user.id, lang_code)
             lang_data = LANGUAGES[lang_code]
             
-            # Düymələri təmizləyib təsdiq mesajına çeviririk
+            # Düymələri itirmədən, sadəcə mətnini yeniləyirik ki, menyu bağlanmasın
             await interaction.response.edit_message(
                 content=f"✅ **{lang_data['name']}**{lang_data['lang_selected']}", 
-                view=None
+                view=self # Düymələr yerində qalır
             )
             
             # Rol menyusunu dərhal seçilən dildə çağırırıq
