@@ -18,21 +18,26 @@ class DilRokSelectView(discord.ui.View):
 
     def create_callback(self, lang_code):
         async def button_callback(interaction: discord.Interaction):
-            # Seçilən dili botun yaddaşında qeyd edirik
+            # 1. Dili yadda saxlayırıq
             set_user_lang(interaction.user.id, lang_code)
             lang_data = LANGUAGES[lang_code]
             
-            # Menyunu heç vaxt bağlamırıq (view=self), sadəcə təsdiq mesajı veririk
+            # 2. Menyunu qoruyub saxlayırıq ki, silinənə qədər həmişə açıq qalsın
             await interaction.response.edit_message(
                 content=f"✅ **{lang_data['name']}**{lang_data['lang_selected']}", 
                 view=self
             )
+            
+            # 3. rok.py faylını təhlükəsiz şəkildə çağırıb dərhal modalı açırıq
+            rok_cog = interaction.client.get_cog("RoKBot")
+            if rok_cog:
+                await rok_cog.trigger_registration(interaction, lang_code)
+
         return button_callback
 
 class DilRok(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        # Bot yenidən işə düşəndə daimi menyunun aktiv qalması üçün
         self.bot.add_view(DilRokSelectView())
 
     @commands.command(name="dilrok")
@@ -43,7 +48,6 @@ class DilRok(commands.Cog):
             pass
         
         view = DilRokSelectView()
-        # Daimi olaraq qalacaq dil menyusunu göndəririk
         await ctx.send(view=view)
 
 async def setup(bot):
