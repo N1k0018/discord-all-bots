@@ -26,7 +26,6 @@ def save_data():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(USER_DATA, f, ensure_ascii=False, indent=2)
 
-# Dilə uyğun mətnlər lüğəti
 ROL_METNLERI = {
     "az": {
         "title": "🎭 Rol Seçim Paneli",
@@ -151,20 +150,13 @@ class RolMenu(commands.Cog):
 
         view = RolSelectView(user_id, user_lang)
 
-        # Əgər əvvəl açıq menyu varsa silirik
         if user_id in self.active_menus:
             try:
                 await self.active_menus[user_id].delete()
             except:
                 pass
 
-        # İstifadəçinin seçdiyi dildə və yalnız ona özəl (ephemeral) olaraq göndəririk
-        if interaction.response.is_done():
-            msg = await interaction.followup.send(embed=embed, view=view, ephemeral=True)
-        else:
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            msg = await interaction.original_response()
-            
+        msg = await interaction.followup.send(embed=embed, view=view, ephemeral=True)
         self.active_menus[user_id] = msg
 
     @commands.command()
@@ -174,16 +166,6 @@ class RolMenu(commands.Cog):
         except:
             pass
         
-        # !rolmenu yazanda da birbaşa istifadəçinin dilində açılır
-        class DummyInteraction:
-            def __init__(self, ctx):
-                self.user = ctx.author
-                self.client = ctx.bot
-                self.response = ctx.channel # fallback
-            async def followup_send(self, *args, **kwargs):
-                return await ctx.send(*args, **kwargs)
-        
-        # Sadə simulyasiya ilə göndəririk
         user_id = ctx.author.id
         user_lang = get_user_lang(user_id)
         texts = ROL_METNLERI.get(user_lang, ROL_METNLERI["en"])
