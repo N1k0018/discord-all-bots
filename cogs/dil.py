@@ -2,6 +2,18 @@ import discord
 from discord.ext import commands
 from locales import LANGUAGES, get_user_lang, set_user_lang
 
+# Dillerin Discord-dakı rol ID-ləri (Sənin kodundakı ID-lər)
+DILLER_ROLE_IDS = {
+    "az": 1526232723029758073,
+    "tr": 1526233376678481920,
+    "en": 1526233442616868974,
+    "es": 1526233508610310256,
+    "fr": 1526233568043602062,
+    "ru": 1526275300738990133,
+    "de": 1526275400194592778,
+    "ar": 1526233633650901132,
+}
+
 class LanguageSelectView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -18,26 +30,30 @@ class LanguageSelectView(discord.ui.View):
 
     def create_callback(self, lang_code):
         async def button_callback(interaction: discord.Interaction):
-            LANG_ROLE_IDS = [
-                1526232723029758073, 1526233376678481920, 1526233442616868974,
-                1526233508610310256, 1526233568043602062, 1526275300738990133,
-                1526275400194592778, 1526233733752033411, 1526233677053562890,
-                1526233633650901132
-            ]
-            eski_diller = [r for r in interaction.user.roles if r.id in LANG_ROLE_IDS]
-            if eski_diller:
-                await interaction.user.remove_roles(*eski_diller)
+            # 1. İstifadəçinin üzərindəki köhnə dil rollarını tapıb silirik
+            eski_dil_rol_idleri = list(DILLER_ROLE_IDS.values())
+            eski_roller = [r for r in interaction.user.roles if r.id in eski_dil_rol_idleri]
+            if eski_roller:
+                await interaction.user.remove_roles(*eski_roller)
 
+            # 2. Seçdiyi yeni dilin rolunu serverdən tapıb istifadəçiyə veririk
+            yeni_rol_id = DILLER_ROLE_IDS.get(lang_code)
+            if yeni_rol_id:
+                yeni_rol = interaction.guild.get_role(yeni_rol_id)
+                if yeni_rol:
+                    await interaction.user.add_roles(yeni_rol)
+
+            # 3. Botun daxili yaddaşındakı dili yeniləyirik
             set_user_lang(interaction.user.id, lang_code)
             lang_data = LANGUAGES[lang_code]
             
-            # Düymələri itirmədən, sadəcə mətnini yeniləyirik ki, menyu bağlanmasın
+            # 4. Menyunu bağlamadan mətnini yeniləyirik
             await interaction.response.edit_message(
                 content=f"✅ **{lang_data['name']}**{lang_data['lang_selected']}", 
-                view=self # Düymələr yerində qalır
+                view=self
             )
             
-            # Rol menyusunu dərhal seçilən dildə çağırırıq
+            # 5. Rol menyusunu dərhal seçilən dildə çağırırıq
             cog = interaction.client.get_cog("RolMenu")
             if cog:
                 await cog.send_rolmenu_to_user(interaction)
