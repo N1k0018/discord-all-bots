@@ -1,22 +1,8 @@
 import discord
 from discord.ext import commands
-from datetime import datetime, timedelta
-import os
-import json
 from locales import get_user_lang
 
-DATA_FILE = "rok_cooldowns.json"
-
-def load_cooldowns():
-    if not os.path.exists(DATA_FILE):
-        return {}
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-def save_cooldowns(data):
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
+# Dil seçimlərinə uyğun mətnlər və başlıqlar
 ROK_METNLERI = {
     "az": {
         "modal_title": "RoK Qeydiyyat",
@@ -25,8 +11,7 @@ ROK_METNLERI = {
         "select_placeholder": "Birlikləri seçin...",
         "success": "✅ Güncellendi: {roles}",
         "no_roles": "Hiçbir birlik seçilmedi.",
-        "not_yours": "❌ Bu menyu sənə aid deyil!",
-        "cooldown": "❌ Yenidən qeydiyyatdan keçmək üçün 3 dəqiqə gözləməlisən."
+        "not_yours": "❌ Bu menyu sənə aid deyil!"
     },
     "tr": {
         "modal_title": "RoK Kayıt",
@@ -35,8 +20,7 @@ ROK_METNLERI = {
         "select_placeholder": "Birlikleri seçin...",
         "success": "✅ Güncellendi: {roles}",
         "no_roles": "Hiçbir birlik seçilmedi.",
-        "not_yours": "❌ Bu menü sana ait değil!",
-        "cooldown": "❌ Tekrar kayıt olmak için 3 dakika beklemelisin."
+        "not_yours": "❌ Bu menü sana ait değil!"
     },
     "en": {
         "modal_title": "RoK Registration",
@@ -45,8 +29,7 @@ ROK_METNLERI = {
         "select_placeholder": "Select units...",
         "success": "✅ Updated: {roles}",
         "no_roles": "No units selected.",
-        "not_yours": "❌ This menu is not for you!",
-        "cooldown": "❌ You must wait 3 minutes to register again."
+        "not_yours": "❌ This menu is not for you!"
     },
     "es": {
         "modal_title": "Registro RoK",
@@ -55,8 +38,7 @@ ROK_METNLERI = {
         "select_placeholder": "Seleccionar unidades...",
         "success": "✅ Actualizado: {roles}",
         "no_roles": "Ninguna unidad seleccionada.",
-        "not_yours": "❌ ¡Este menú no es para ti!",
-        "cooldown": "❌ Debes esperar 3 minutos para registrarte de nuevo."
+        "not_yours": "❌ ¡Este menú no es para ti!"
     },
     "fr": {
         "modal_title": "Inscription RoK",
@@ -65,8 +47,7 @@ ROK_METNLERI = {
         "select_placeholder": "Sélectionner des unités...",
         "success": "✅ Mis à jour : {roles}",
         "no_roles": "Aucune unité sélectionnée.",
-        "not_yours": "❌ Ce menu n'est pas pour vous !",
-        "cooldown": "❌ Vous devez attendre 3 minutes pour vous réinscrire."
+        "not_yours": "❌ Ce menu n'est pas pour vous !"
     },
     "ru": {
         "modal_title": "Регистрация RoK",
@@ -75,8 +56,7 @@ ROK_METNLERI = {
         "select_placeholder": "Выберите юниты...",
         "success": "✅ Обновлено: {roles}",
         "no_roles": "Юниты не выбраны.",
-        "not_yours": "❌ Это меню не для вас!",
-        "cooldown": "❌ Подождите 3 минуты перед повторной регистрацией."
+        "not_yours": "❌ Это меню не для вас!"
     },
     "de": {
         "modal_title": "RoK-Registrierung",
@@ -85,8 +65,7 @@ ROK_METNLERI = {
         "select_placeholder": "Einheiten auswählen...",
         "success": "✅ Aktualisiert: {roles}",
         "no_roles": "Keine Einheiten ausgewählt.",
-        "not_yours": "❌ Dieses Menü ist nicht für dich!",
-        "cooldown": "❌ Du musst 3 Minuten warten, um dich erneut zu registrieren."
+        "not_yours": "❌ Dieses Menü ist nicht für dich!"
     },
     "ar": {
         "modal_title": "تسجيل RoK",
@@ -95,8 +74,7 @@ ROK_METNLERI = {
         "select_placeholder": "حدد الوحدات...",
         "success": "✅ تم التحديث: {roles}",
         "no_roles": "لم يتم اختيار أي وحدة.",
-        "not_yours": "❌ هذه القائمة ليست لك!",
-        "cooldown": "❌ يجب عليك الانتظار 3 دقائق للتسجيل مرة أخرى."
+        "not_yours": "❌ هذه القائمة ليست لك!"
     }
 }
 
@@ -153,32 +131,18 @@ class RoKBot(commands.Cog):
             "Siege": 1526342109983014942
         }
 
-    @commands.command()
-    async def kayit(self, ctx):
+    # İstəyə görə əgər kimsə əlavə olaraq !kayit yazmaq istəsə, bu da işləyəcək
+    @commands.command(name="kayit")
+    @commands.has_permissions(administrator=True)
+    async def kayit_command(self, ctx):
         try:
             await ctx.message.delete()
         except:
             pass
         
-        user_id = str(ctx.author.id)
         user_lang = get_user_lang(ctx.author.id)
         texts = ROK_METNLERI.get(user_lang, ROK_METNLERI["en"])
-
-        # 3 dəqiqəlik cooldown yoxlaması
-        cooldowns = load_cooldowns()
-        now = datetime.now()
-
-        if user_id in cooldowns:
-            last_time = datetime.fromisoformat(cooldowns[user_id])
-            if now - last_time < timedelta(minutes=3):
-                await ctx.send(texts["cooldown"], delete_after=5)
-                return
-
-        # Cooldown vaxtını yeniləyirik
-        cooldowns[user_id] = now.isoformat()
-        save_cooldowns(cooldowns)
-
-        # İstifadəçinin qarşısına birbaşa düymə çıxır, basan kimi seçdiyi dildə modal açılır
+        
         class DirectButtonView(discord.ui.View):
             def __init__(self, role_dict, lang_texts, author_id):
                 super().__init__(timeout=60)
@@ -194,8 +158,7 @@ class RoKBot(commands.Cog):
                 await interaction.response.send_modal(NicknameModal(self.role_dict, self.lang_texts, interaction.user.id))
 
         view = DirectButtonView(self.ROLE_IDS, texts, ctx.author.id)
-        btn_msg = "Registering..." if user_lang == "en" else "Qeydiyyat üçün tıkla..."
-        await ctx.send(btn_msg, view=view, delete_after=60)
+        await ctx.send(view=view, delete_after=60)
 
 async def setup(bot):
     await bot.add_cog(RoKBot(bot))
