@@ -18,7 +18,6 @@ class DilRokSelectView(discord.ui.View):
 
     def create_callback(self, lang_code):
         async def button_callback(interaction: discord.Interaction):
-            # Sadece botun dil yaddaşını yeniləyirik, heç bir rol verilmir
             set_user_lang(interaction.user.id, lang_code)
             lang_data = LANGUAGES[lang_code]
             
@@ -41,11 +40,8 @@ class DilRok(commands.Cog):
             pass
         
         view = DilRokSelectView()
-        # İstifadəçinin cari dilinə uyğun başlığı ala bilərik
-        user_lang = get_user_lang(ctx.author.id)
-        menu_title = LANGUAGES[user_lang]["menu_title"]
-        
-        await ctx.send(menu_title, view=view)
+        # Heç bir yazı yazmadan, sadəcə düymələri (view) göndəririk
+        await ctx.send(view=view)
 
 async def setup(bot):
     await bot.add_cog(DilRok(bot))
