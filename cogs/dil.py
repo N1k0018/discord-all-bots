@@ -4,12 +4,12 @@ from locales import LANGUAGES, get_user_lang, set_user_lang
 
 class LanguageSelectView(discord.ui.View):
     def __init__(self):
-        super().__init__(timeout=None) # Düymələrin daimi işləməsi üçün
+        super().__init__(timeout=None)
         
         for code, data in LANGUAGES.items():
             button = discord.ui.Button(
-                label=data["name"].split(" ")[1], # Dilin adı (məs: Azərbaycanca)
-                emoji=data["name"].split(" ")[0], # Bayraq emoji
+                label=data["name"].split(" ")[1],
+                emoji=data["name"].split(" ")[0],
                 style=discord.ButtonStyle.secondary,
                 custom_id=f"lang_btn_{code}"
             )
@@ -21,11 +21,18 @@ class LanguageSelectView(discord.ui.View):
             set_user_lang(interaction.user.id, lang_code)
             lang_data = LANGUAGES[lang_code]
             
-            # İstifadəçiyə yalnız onun özünün görəcəyi təsdiq mesajı (ephemeral)
+            # Dil seçilən kimi istifadəçiyə bildiririk
             await interaction.response.send_message(
                 f"✅ **{lang_data['name']}**{lang_data['lang_selected']}", 
                 ephemeral=True
             )
+            
+            # VƏ AVTOMATİK OLARAK HƏMİN ÇATƏ ROL MENYUNU GÖNDƏRİRİK (seçdiyi dildə)
+            # Burada birbaşa rolmenu funksiyasını çağırırıq
+            cog = interaction.client.get_cog("RolMenu")
+            if cog:
+                await cog.send_rolmenu_to_user(interaction)
+
         return button_callback
 
 class DilCog(commands.Cog):
@@ -35,18 +42,14 @@ class DilCog(commands.Cog):
 
     @commands.command(name="dil")
     async def dil_command(self, ctx):
-        # İstifadəçinin yazdığı !dil mesajını silirik ki, kanal təmiz qalsın
         try:
             await ctx.message.delete()
         except:
             pass
         
-        user_lang = get_user_lang(ctx.author.id)
-        menu_text = LANGUAGES[user_lang]["menu_title"]
-        
         view = LanguageSelectView()
-        # Menyunu kanala göndəririk (bunu istədiyin vaxt yaza bilərsən)
-        await ctx.send(menu_text, view=view)
+        # Yuxarıda heç bir yazı yazmırıq, sadəcə view (düymələr) göndəririk
+        await ctx.send(view=view)
 
 async def setup(bot):
     await bot.add_cog(DilCog(bot))
