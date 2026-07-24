@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 from locales import get_user_lang
 
-# Hər dil üçün tərcümələr
 KAYIT_METNLERI = {
     "az": {
         "button_label": "Kaydı Başlat",
@@ -94,6 +93,63 @@ KAYIT_METNLERI = {
     }
 }
 
+class RoleToggleSelect(discord.ui.Select):
+    def __init__(self, role_dict, lang_texts, user_id):
+        self.role_dict = role_dict
+        self.lang_texts = lang_texts
+        self.user_id = user_id
+        options = [discord.SelectOption(label=name, value=str(rid)) for name, rid in role_dict.items()]
+        super().__init__(placeholder=lang_texts["select_placeholder"], min_values=0, max_values=len(role_dict), options=options)
+    
+    async def callback(self, i: discord.Interaction):
+        if i.user.id != self.user_id:
+            await i.response.send_message(self.lang_texts["not_yours"], ephemeral=True)
+            return
+
+        selected_ids = [int(v) for v in self.values]
+        all_role_ids = list(self.role_dict.values())
+        
+        remove_roles = [r for r in i.user.roles if r.id in all_role_ids]
+        if remove_roles:
+            await i.user.remove_roles(*remove_roles)
+        
+        add_roles = [i.guild.get_role(rid) for rid in selected_ids if i.guild.get_role(rid)]
+        if add_roles:
+            await i.user.add_roles(*add_roles)
+        
+        roles_str = ', '.join([r.name for r in add_roles]) if add_roles else self.lang_texts["no_roles"]
+        msg = self.lang_texts["success"].format(roles=roles_str)
+        await i.response.send_message(msg, ephemeral=True)
+
+class NicknameModal(discord.ui.Modal):
+    def __init__(self, role_dict, lang_texts, user_id):
+        super().__init__(title=lang_texts["modal_title"])
+        self.role_dict = role_dict
+        self.lang_texts = lang_texts
+        self.user_id = user_id
+        
+        self.isim = discord.ui.TextInput(label=lang_texts["modal_label"], required=True)
+        self.add_item(self.isim)
+    
+    async def on_submit(self, i: discord.Interaction):
+        await i.user.edit(nick=str(self.isim))
+        view = discord.ui.View().add_item(RoleToggleSelect(self.role_dict, self.lang_texts, self.user_id))
+        await i.response.send_message(self.lang_texts["modal_response"], view=view, ephemeral=True)
+
+class KayitButtonView(discord.ui.View):
+    def __init__(self, role_dict):
+        super().__init__(timeout=None)
+        self.role_dict = role_dict
+
+    @discord.ui.button(label="Kaydı Başlat / Register", style=discord.ButtonStyle.primary, custom_id="persistent_kayit_btn")
+    async def register_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # İstifadəçi düyməyə basan ANDA onun dilini yoxlayırıq
+        user_lang = get_user_lang(interaction.user.id)
+        texts = KAYIT_METNLERI.get(user_lang, KAYIT_METNLERI["en"])
+        
+        # Həmin dilə uyğun modal açırıq
+        await interaction.response.send_modal(NicknameModal(self.role_dict, texts, interaction.user.id))
+
 class RoKBot(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
@@ -103,6 +159,8 @@ class RoKBot(commands.Cog):
             "Archery": 1526342056430141440,
             "Siege": 1526342109983014942
         }
+        # Bot işə düşəndə persistent view-u qeydiyyata alırıq ki, düymələr işləsin
+        self.bot.add_view(KayitButtonView(self.ROLE_IDS))
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -112,62 +170,7 @@ class RoKBot(commands.Cog):
         user_lang = get_user_lang(ctx.author.id)
         texts = KAYIT_METNLERI.get(user_lang, KAYIT_METNLERI["en"])
 
-        # Seçim menüsü
-        class RoleToggleSelect(discord.ui.Select):
-            def __init__(self, role_dict, lang_texts, user_id):
-                self.role_dict = role_dict
-                self.lang_texts = lang_texts
-                self.user_id = user_id
-                options = [discord.SelectOption(label=name, value=str(rid)) for name, rid in role_dict.items()]
-                super().__init__(placeholder=lang_texts["select_placeholder"], min_values=0, max_values=len(role_dict), options=options)
-            
-            async def callback(self, i: discord.Interaction):
-                if i.user.id != self.user_id:
-                    await i.response.send_message(self.lang_texts["not_yours"], ephemeral=True)
-                    return
-
-                selected_ids = [int(v) for v in self.values]
-                all_role_ids = list(self.role_dict.values())
-                
-                remove_roles = [r for r in i.user.roles if r.id in all_role_ids]
-                if remove_roles:
-                    await i.user.remove_roles(*remove_roles)
-                
-                add_roles = [i.guild.get_role(rid) for rid in selected_ids if i.guild.get_role(rid)]
-                if add_roles:
-                    await i.user.add_roles(*add_roles)
-                
-                roles_str = ', '.join([r.name for r in add_roles]) if add_roles else self.lang_texts["no_roles"]
-                msg = self.lang_texts["success"].format(roles=roles_str)
-                await i.response.send_message(msg, ephemeral=True)
-
-        # Modal
-        class NicknameModal(discord.ui.Modal):
-            def __init__(self, role_dict, lang_texts, user_id):
-                super().__init__(title=lang_texts["modal_title"])
-                self.role_dict = role_dict
-                self.lang_texts = lang_texts
-                self.user_id = user_id
-                
-                self.isim = discord.ui.TextInput(label=lang_texts["modal_label"], required=True)
-                self.add_item(self.isim)
-            
-            async def on_submit(self, i: discord.Interaction):
-                await i.user.edit(nick=str(self.isim))
-                view = discord.ui.View().add_item(RoleToggleSelect(self.role_dict, self.lang_texts, self.user_id))
-                await i.response.send_message(self.lang_texts["modal_response"], view=view, ephemeral=True)
-
-        # Buton
-        btn = discord.ui.Button(label=texts["button_label"], style=discord.ButtonStyle.primary)
-        
-        async def button_callback(i: discord.Interaction):
-            # Qeydiyyat düyməsinə basan şəxsin dilini təzədən yoxlayırıq
-            current_lang = get_user_lang(i.user.id)
-            current_texts = KAYIT_METNLERI.get(current_lang, KAYIT_METNLERI["en"])
-            await i.response.send_modal(NicknameModal(self.ROLE_IDS, current_texts, i.user.id))
-
-        btn.callback = button_callback
-        view = discord.ui.View(timeout=None).add_item(btn)
+        view = KayitButtonView(self.ROLE_IDS)
         await ctx.send(texts["ctx_message"], view=view)
 
 async def setup(bot):
