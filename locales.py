@@ -41,11 +41,9 @@ LANGUAGES = {
     }
 }
 
-# İstifadəçilərin dillərini yadda saxlamaq üçün lüğət
 USER_LANGUAGES = {}
 
 def get_user_lang(user_id: int) -> str:
-    # İstifadəçi hələ dil seçməyibsə, standart olaraq azərbaycanca ("az") götürürük
     return USER_LANGUAGES.get(user_id, "az")
 
 def set_user_lang(user_id: int, lang_code: str):
