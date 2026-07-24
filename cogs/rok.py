@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 from locales import get_user_lang
 
-# Dil seçimlərinə uyğun mətnlər və başlıqlar
 ROK_METNLERI = {
     "az": {
         "modal_title": "RoK Qeydiyyat",
@@ -38,7 +37,7 @@ ROK_METNLERI = {
         "select_placeholder": "Seleccionar unidades...",
         "success": "✅ Actualizado: {roles}",
         "no_roles": "Ninguna unidad seleccionada.",
-        "not_yours": "❌ ¡Este menú no es para ti!"
+        "not_yours": "❌ ¡Este menú no es für ti!"
     },
     "fr": {
         "modal_title": "Inscription RoK",
@@ -131,34 +130,9 @@ class RoKBot(commands.Cog):
             "Siege": 1526342109983014942
         }
 
-    # İstəyə görə əgər kimsə əlavə olaraq !kayit yazmaq istəsə, bu da işləyəcək
-    @commands.command(name="kayit")
-    @commands.has_permissions(administrator=True)
-    async def kayit_command(self, ctx):
-        try:
-            await ctx.message.delete()
-        except:
-            pass
-        
-        user_lang = get_user_lang(ctx.author.id)
-        texts = ROK_METNLERI.get(user_lang, ROK_METNLERI["en"])
-        
-        class DirectButtonView(discord.ui.View):
-            def __init__(self, role_dict, lang_texts, author_id):
-                super().__init__(timeout=60)
-                self.role_dict = role_dict
-                self.lang_texts = lang_texts
-                self.author_id = author_id
-
-            @discord.ui.button(label="📝 RoK Register", style=discord.ButtonStyle.primary)
-            async def open_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
-                if interaction.user.id != self.author_id:
-                    await interaction.response.send_message(self.lang_texts["not_yours"], ephemeral=True)
-                    return
-                await interaction.response.send_modal(NicknameModal(self.role_dict, self.lang_texts, interaction.user.id))
-
-        view = DirectButtonView(self.ROLE_IDS, texts, ctx.author.id)
-        await ctx.send(view=view, delete_after=60)
+    async def trigger_registration(self, interaction: discord.Interaction, lang_code: str):
+        texts = ROK_METNLERI.get(lang_code, ROK_METNLERI["en"])
+        await interaction.response.send_modal(NicknameModal(self.ROLE_IDS, texts, interaction.user.id))
 
 async def setup(bot):
     await bot.add_cog(RoKBot(bot))
